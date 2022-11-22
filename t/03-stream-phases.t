@@ -7,7 +7,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: basic print
+=== TEST 1: support preread phase in stream subsystem
 --- stream_config eval
     "lua_package_path 'src/?.lua;;';"
 --- stream_server_config
