@@ -1,5 +1,5 @@
 package = "api7-lua-resty-dns-client"
-version = "0-0"
+version = "master-0"
 source = {
     url = "https://github.com/api7/lua-resty-dns-client",
     branch = "master",
@@ -15,6 +15,7 @@ description = {
   homepage = "https://github.com/api7/lua-resty-dns-client",
   license = "Apache 2.0"
 }
+
 dependencies = {
   "lua >= 5.1, < 5.4",
   "penlight ~> 1",
@@ -23,6 +24,7 @@ dependencies = {
   "binaryheap >= 0.4",
   "luaxxhash >= 1.0",
 }
+
 build = {
   type = "builtin",
   modules = {
