@@ -4,12 +4,17 @@ plan tests => repeat_each() * (blocks() * 5);
 
 workers(6);
 
+our $HttpConfig = qq{
+    lua_package_path "deps/share/lua/5.1/?.lua;deps/share/lua/5.1/?.lua;src/?.lua;src/?/?.lua;src/?/init.lua;;";
+};
+
 no_shuffle();
 run_tests();
 
 __DATA__
 
 === TEST 1: client supports access phase
+--- http_config eval: $::HttpConfig
 --- config
     location = /t {
         access_by_lua_block {
@@ -47,6 +52,7 @@ qq {
         local typ = client.TYPE_A
         answers, err = client.resolve(host, { qtype = typ })
     }
+    lua_package_path "deps/share/lua/5.1/?.lua;deps/share/lua/5.1/?.lua;src/?.lua;src/?/?.lua;src/?/init.lua;;";
 }
 --- config
     location = /t {
