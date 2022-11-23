@@ -13,16 +13,16 @@ test: lint
 ### install:      Install the library to runtime
 .PHONY: install
 install:
-	luarocks install rockspec/api7-lua-resty-dns-client-master-0-0.rockspec
+	luarocks install rockspec/api7-lua-resty-dns-client-master-0.rockspec
 
 
 ### deps:         Installation dependencies
 .PHONY: deps
 deps:
 ifneq ($(LUAROCKS_VER),luarocks 3.)
-	luarocks install rockspec/api7-lua-resty-dns-client-master-0-0.rockspec --tree=deps --only-deps --local
+	luarocks install rockspec/api7-lua-resty-dns-client-master-0.rockspec --tree=deps --only-deps --local
 else
-	luarocks install --lua-dir=$(LUAJIT_DIR) rockspec/api7-lua-resty-dns-client-master-0-0.rockspec --tree=deps --only-deps --local
+	luarocks install --lua-dir=$(LUAJIT_DIR) rockspec/api7-lua-resty-dns-client-master-0.rockspec --tree=deps --only-deps --local
 endif
 
 
