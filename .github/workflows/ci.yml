@@ -19,7 +19,7 @@ jobs:
 
       - name: Linux Get dependencies
         run: |
-          sudo apt install -y cpanminus build-essential libncurses5-dev libreadline-dev libssl-dev perl
+          sudo apt install -y cpanminus build-essential libncurses5-dev libreadline-dev libssl-dev perl lua5.1 liblua5.1-0-dev
           curl -fsSL https://raw.githubusercontent.com/apache/apisix/master/utils/linux-install-luarocks.sh | sh
 
       - name: Linux Before install
