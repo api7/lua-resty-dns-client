@@ -34,6 +34,7 @@ qq {
         workers = ngx.worker.count()
         timers = ngx.timer.pending_count()
     }
+    lua_package_path "deps/share/lua/5.1/?.lua;deps/share/lua/5.1/?.lua;src/?.lua;src/?/?.lua;src/?/init.lua;;";
 }
 --- config
     location = /t {

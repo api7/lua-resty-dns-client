@@ -4,11 +4,16 @@ use Test::Nginx::Socket::Lua;
 
 plan tests => 2;
 
+our $HttpConfig = qq{
+    lua_package_path "deps/share/lua/5.1/?.lua;deps/share/lua/5.1/?.lua;src/?.lua;src/?/?.lua;src/?/init.lua;;";
+};
+
 run_tests();
 
 __DATA__
 
 === TEST 1: load lua-resty-dns-client
+--- http_config eval: $::HttpConfig
 --- config
     location = /t {
         access_by_lua_block {
