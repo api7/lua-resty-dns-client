@@ -392,7 +392,8 @@ describe("[DNS client cache]", function()
       sleep(0.1)
       -- background resolve is now complete, check the cache, it should still have the
       -- stale record, and it should not have been replaced by the empty record
-      assert.equal(rec1, lrucache:get(client.TYPE_A..":myhost9.domain.com"))
+      local _, stale = lrucache:get(client.TYPE_A..":myhost9.domain.com")
+      assert.equal(rec1, stale)
     end)
 
     it("AS records do replace stale records", function()
@@ -405,7 +406,7 @@ describe("[DNS client cache]", function()
         cname = "myotherhost.domain.com",
         class = 1,
         name = "myhost9.domain.com",
-        ttl = 0.5,
+        ttl = 0.1,
       }
       local A2 = {
         type = client.TYPE_A,
@@ -427,11 +428,11 @@ describe("[DNS client cache]", function()
       })
 
       assert(client.resolve("myhost9", { qtype = client.TYPE_CNAME }))
-      ngx.sleep(0.6)  -- wait for it to become stale
+      ngx.sleep(0.2)  -- wait for it to become stale
       assert(client.toip("myhost9"))
 
-      local cached = lrucache:get(client.TYPE_CNAME..":myhost9.domain.com")
-      assert.are.equal(CNAME1, cached[1])
+      local _, stale = lrucache:get(client.TYPE_CNAME..":myhost9.domain.com")
+      assert.are.equal(CNAME1, stale[1])
     end)
 
   end)
