@@ -328,7 +328,7 @@ describe("[DNS client cache]", function()
         address = "1.2.3.4",
         class = 1,
         name = "myhost9.domain.com",
-        ttl = 0.1,
+        ttl = 0.5,
       }}
       mock_records = {
         ["myhost9.domain.com:"..client.TYPE_A] = rec1,
@@ -340,7 +340,7 @@ describe("[DNS client cache]", function()
       assert.is_nil(err)
       assert.equal(rec1, lrucache:get(client.TYPE_A..":myhost9.domain.com"))
 
-      sleep(0.15) -- make sure we surpass the ttl of 0.1 of the record, so it is now stale.
+      sleep(0.55) -- make sure we surpass the ttl of 0.1 of the record, so it is now stale.
       -- clear mock records, such that we return name errors instead of records
       local rec2 = {
         errcode = 3,
@@ -366,7 +366,7 @@ describe("[DNS client cache]", function()
         address = "1.2.3.4",
         class = 1,
         name = "myhost9.domain.com",
-        ttl = 0.1,
+        ttl = 0.5,
       }}
       mock_records = {
         ["myhost9.domain.com:"..client.TYPE_A] = rec1,
@@ -378,7 +378,7 @@ describe("[DNS client cache]", function()
       assert.is_nil(err)
       assert.equal(rec1, lrucache:get(client.TYPE_A..":myhost9.domain.com"))
 
-      sleep(0.15) -- make sure we surpass the ttl of 0.1 of the record, so it is now stale.
+      sleep(0.55) -- make sure we surpass the ttl of 0.1 of the record, so it is now stale.
       -- clear mock records, such that we return name errors instead of records
       local rec2 = {}
       mock_records = {
@@ -405,7 +405,7 @@ describe("[DNS client cache]", function()
         cname = "myotherhost.domain.com",
         class = 1,
         name = "myhost9.domain.com",
-        ttl = 0.1,
+        ttl = 0.5,
       }
       local A2 = {
         type = client.TYPE_A,
@@ -427,7 +427,7 @@ describe("[DNS client cache]", function()
       })
 
       assert(client.resolve("myhost9", { qtype = client.TYPE_CNAME }))
-      ngx.sleep(0.2)  -- wait for it to become stale
+      ngx.sleep(0.6)  -- wait for it to become stale
       assert(client.toip("myhost9"))
 
       local cached = lrucache:get(client.TYPE_CNAME..":myhost9.domain.com")
