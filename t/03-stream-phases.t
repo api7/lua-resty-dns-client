@@ -11,7 +11,7 @@ __DATA__
 --- stream_config eval
     "lua_package_path 'src/?.lua;;';"
 --- stream_server_config
-    preread_by_lua_block {
+    content_by_lua_block {
         local client = require("resty.dns.client")
         assert(client.init())
         local host = "localhost"
@@ -24,7 +24,5 @@ __DATA__
 
         ngx.print("address name: ", answers[1].name)
     }
-
-    content_by_lua return;
 --- stream_response chop
 address name: localhost
