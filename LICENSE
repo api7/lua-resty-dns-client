@@ -200,3 +200,15 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+========================================================================
+Apache 2.0 licenses
+========================================================================
+
+This software is a secondary release of open source software based on the Apache License 2.0 protocol.This software has been modified, please refer to the revision history(in REANME.md) for specific modification content.
+
+Please note that the name of this software has been changed to "api7-lua-resty-dns-client" to distinguish it from the original software. Do not confuse this software with the original software.
+
+This software complies with all terms of the Apache License 2.0 agreement. Please make sure you have read and understood all terms of the Apache License 2.0 agreement.
+
+Thank you for using this software. If you encounter any problems while using this software, please feel free to contact us.

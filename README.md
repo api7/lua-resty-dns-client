@@ -29,6 +29,12 @@ Author: Thijs Schreijer
 
 License: [Apache 2.0](https://opensource.org/licenses/Apache-2.0)
 
+Revision history:
+
+### 0.0.1 (08-Dec-2022)
+
+- Feat: support run in stream subsystem. [PR 1](https://github.com/api7/lua-resty-dns-client/pull/1)
+
 Testing
 =======
 
