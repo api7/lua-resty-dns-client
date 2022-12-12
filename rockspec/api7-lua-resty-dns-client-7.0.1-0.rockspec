@@ -1,7 +1,7 @@
 package = "api7-lua-resty-dns-client"
 version = "7.0.1-0"
 source = {
-    url = "https://github.com/api7/lua-resty-dns-client",
+    url = "git://github.com/api7/lua-resty-dns-client",
     tag = "v7.0.1",
 }
 
