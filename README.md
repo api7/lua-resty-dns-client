@@ -31,9 +31,6 @@ License: [Apache 2.0](https://opensource.org/licenses/Apache-2.0)
 
 Revision history:
 
-### 7.0.1 (08-Dec-2022)
-
-- Feat: support run in stream subsystem. [PR 1](https://github.com/api7/lua-resty-dns-client/pull/1)
 
 Testing
 =======
@@ -55,6 +52,14 @@ Release process:
 3. generate the docs using `ldoc .`
 4. commit and tag the release
 5. upload rock to LuaRocks
+
+### 7.1.0 (31-dec-2025)
+
+* feat: only cache final target record when dns sever response. [PR 7](https://github.com/api7/lua-resty-dns-client/pull/7)
+
+### 7.0.1 (08-Dec-2022)
+
+- Feat: support run in stream subsystem. [PR 1](https://github.com/api7/lua-resty-dns-client/pull/1)
 
 ### 6.0.2 (05-Jul-2021)
 
