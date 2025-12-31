@@ -57,6 +57,7 @@ local badTtl               -- ttl (in seconds) for a other dns error results
 local staleTtl             -- ttl (in seconds) to serve stale data (while new lookup is in progress)
 local validTtl             -- ttl (in seconds) to use to override ttl of any valid answer
 local cacheSize            -- size of the lru cache
+local finalCacheOnly       -- when set to true, only cache final results, not intermediate results
 local noSynchronisation
 local orderValids = {"LAST", "SRV", "A", "AAAA", "CNAME"} -- default order to query
 local typeOrder            -- array with order of types to try
@@ -547,6 +548,7 @@ _M.init = function(options)
   validTtl = options.validTtl
   log(DEBUG, PREFIX, "validTtl = ", tostring(validTtl))
 
+  finalCacheOnly = options.finalCacheOnly
   -- Deal with the `resolv.conf` file
 
   local resolvconffile = options.resolvConf or utils.DEFAULT_RESOLV_CONF
@@ -650,6 +652,29 @@ local function parseAnswer(qname, qtype, answers, try_list)
       check_qname = qname:sub(1, -2) -- FQDN, drop the last dot
     else
       check_qname = qname
+    end
+  end
+
+  if finalCacheOnly then
+    -- when only caching final results, we remove all non-requested
+    if #answers >= 2 and answers[#answers].type == qtype then
+      local min_ttl = math.huge
+      local j = 0
+      for i = 1, #answers do
+        min_ttl = math_min(answers[i].ttl, min_ttl)
+        if answers[i].type == qtype then
+          j = j + 1
+          answers[j] = answers[i]
+        end
+      end
+      for i = 1, #answers do
+        if i > j then
+          table.remove(answers)
+        else
+          answers[i].name = check_qname
+          answers[i].ttl = min_ttl
+        end
+      end
     end
   end
 

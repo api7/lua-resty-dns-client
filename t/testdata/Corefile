@@ -1,0 +1,23 @@
+.:15353 {
+    log
+    errors
+    bufsize 512
+
+    template IN A {
+        match "^two\.cloudfront\.net\.$"
+        answer "{{ .Name }} 10 IN A 18.155.68.66"
+        answer "{{ .Name }} 10 IN A 18.155.68.67"
+        fallthrough
+    }
+
+    template IN A {
+        match "^one\.cloudfront\.net\.$"
+        answer "{{ .Name }} 3 IN CNAME two.cloudfront.net."
+        fallthrough
+    }
+
+    template IN A {
+        match "^run\.api7\.ai\.$"
+        answer "{{ .Name }} 10 IN CNAME one.cloudfront.net."
+    }
+}

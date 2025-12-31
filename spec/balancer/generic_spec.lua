@@ -1894,7 +1894,7 @@ for algorithm, balancer_module in helpers.balancer_types() do
                 {
                   host = "notachanceinhell.this.name.exists.konghq.com",
                   port = 4321,
-                  dns = "dns server error: 3 name error",
+                  dns = "dns client error: 101 empty record received",
                   nodeWeight = 100,
                   weight = {
                     total = 0,
@@ -2024,7 +2024,7 @@ for algorithm, balancer_module in helpers.balancer_types() do
                 {
                   host = "notachanceinhell.this.name.exists.konghq.com",
                   port = 4321,
-                  dns = "dns server error: 3 name error",
+                  dns = "dns client error: 101 empty record received",
                   nodeWeight = 100,
                   weight = {
                     total = 0,
