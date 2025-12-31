@@ -6,6 +6,7 @@
     template IN A {
         match "^two\.cloudfront\.net\.$"
         answer "{{ .Name }} 10 IN A 18.155.68.66"
+        answer "{{ .Name }} 10 IN A 18.155.68.67"
         fallthrough
     }
 

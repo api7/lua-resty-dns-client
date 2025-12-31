@@ -659,12 +659,22 @@ local function parseAnswer(qname, qtype, answers, try_list)
     -- when only caching final results, we remove all non-requested
     if #answers >= 2 and answers[#answers].type == qtype then
       local min_ttl = math.huge
-      for i = #answers - 1, 1, -1 do
+      local j = 0
+      for i = 1, #answers do
         min_ttl = math_min(answers[i].ttl, min_ttl)
-        table_remove(answers, i)
+        if answers[i].type == qtype then
+          j = j + 1
+          answers[j] = answers[i]
+        end
       end
-      answers[#answers].name = check_qname
-      answers[#answers].ttl = math_min(answers[#answers].ttl, min_ttl)
+      for i = 1, #answers do
+        if i > j then
+          table.remove(answers)
+        else
+          answers[i].name = check_qname
+          answers[i].ttl = min_ttl
+        end
+      end
     end
   end
 

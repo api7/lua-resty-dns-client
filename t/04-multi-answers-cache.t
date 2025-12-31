@@ -32,8 +32,9 @@ __DATA__
             for i = 1, 10 do
                 local answers, err = client.resolve("run.api7.ai", { qtype = client.TYPE_A })
                 assert(err == nil, err)
-                assert(#answers > 0, "no answers returned")
+                assert(#answers == 2, "no answers returned")
                 assert(answers[1].address == "18.155.68.66", "unexpected address: " .. (answers[1].address or "nil"))
+                assert(answers[2].address == "18.155.68.67", "unexpected address: " .. (answers[2].address or "nil"))
                 ngx.sleep(1)  -- Adding a sleep to avoid overwhelming the resolver
             end
             ngx.say("passed")
