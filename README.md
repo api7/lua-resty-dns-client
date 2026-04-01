@@ -53,6 +53,10 @@ Release process:
 4. commit and tag the release
 5. upload rock to LuaRocks
 
+### 7.1.1 (01-Apr-2026)
+
+* fix: exclude additional section records from finalCacheOnly results [PR 11](https://github.com/api7/lua-resty-dns-client/pull/11)
+
 ### 7.1.0 (31-dec-2025)
 
 * feat: only cache final target record when dns sever response. [PR 7](https://github.com/api7/lua-resty-dns-client/pull/7)
