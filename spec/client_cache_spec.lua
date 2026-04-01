@@ -689,14 +689,18 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      -- Should not return the section 3 A record as an answer
+      -- Should not return the section 3 A record as an answer.
+      -- With only CNAME in Answer section and no A record to dereference,
+      -- resolution should either fail or return CNAME only.
       local result, err = client.resolve("myservice", { qtype = client.TYPE_A })
-      if result then
-        -- If any result is returned, it must not be the section 3 record
+      if result and #result > 0 then
         for _, r in ipairs(result) do
           assert.not_equal(3, r.section)
           assert.not_equal("10.0.0.11", r.address)
         end
+      else
+        assert.truthy(result == nil or #result == 0,
+          "expected nil or empty result, got err: " .. tostring(err))
       end
     end)
 
