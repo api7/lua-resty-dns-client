@@ -658,13 +658,21 @@ local function parseAnswer(qname, qtype, answers, try_list)
   if finalCacheOnly then
     -- when only caching final results, we remove all non-requested
     if #answers >= 2 and answers[#answers].type == qtype then
+      local SECTION_AN = 1  -- Answer section
       local min_ttl = math.huge
       local j = 0
       for i = 1, #answers do
-        min_ttl = math_min(answers[i].ttl, min_ttl)
-        if answers[i].type == qtype then
-          j = j + 1
-          answers[j] = answers[i]
+        -- Only keep Answer section (section=1) records. Additional section
+        -- (section=3) records are glue records for nameservers and must not
+        -- be mixed with Answer section records. Without this check, their
+        -- names get overwritten to the queried name below, causing wrong
+        -- IPs to be returned for the queried domain.
+        if answers[i].section == SECTION_AN then
+          min_ttl = math_min(answers[i].ttl, min_ttl)
+          if answers[i].type == qtype then
+            j = j + 1
+            answers[j] = answers[i]
+          end
         end
       end
       for i = 1, #answers do

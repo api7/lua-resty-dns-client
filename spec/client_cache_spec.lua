@@ -552,6 +552,161 @@ describe("[DNS client cache]", function()
   end)
 
 
+-- ==============================================
+--    finalCacheOnly with additional section
+-- ==============================================
+
+
+  describe("finalCacheOnly", function()
+
+    local lrucache, mock_records, config
+    before_each(function()
+      config = {
+        nameservers = { "8.8.8.8" },
+        ndots = 1,
+        search = { "domain.com" },
+        hosts = {},
+        resolvConf = {},
+        order = { "LAST", "SRV", "A", "AAAA", "CNAME" },
+        badTtl = 0.5,
+        staleTtl = 0.5,
+        enable_ipv6 = false,
+        finalCacheOnly = true,
+      }
+      assert(client.init(config))
+      lrucache = client.getcache()
+
+      query_func = function(self, original_query_func, qname, opts)
+        return mock_records[qname..":"..opts.qtype] or { errcode = 3, errstr = "name error" }
+      end
+    end)
+
+    it("excludes additional section records from results", function()
+      -- Simulates a DNS response with:
+      -- Section 1 (Answer): A record for the queried domain
+      -- Section 3 (Additional): A records for nameserver glue records
+      -- Without the fix, finalCacheOnly keeps all type-matching records
+      -- regardless of section, and overwrites their names to the queried
+      -- domain, causing wrong IPs to be returned.
+      mock_records = {
+        ["myservice.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_A,
+            class = 1,
+            name = "myservice.domain.com",
+            address = "10.0.0.1",
+            ttl = 86400,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns1.otherdomain.com",
+            address = "10.0.0.11",
+            ttl = 1200,
+            section = 3,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns2.otherdomain.com",
+            address = "10.0.0.12",
+            ttl = 1200,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myservice", { qtype = client.TYPE_A })
+      assert.equal(1, #result)
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal("myservice.domain.com", result[1].name)
+      assert.equal(1, result[1].section)
+      -- TTL should come from section 1 records only, not from section 3
+      assert.equal(86400, result[1].ttl)
+    end)
+
+    it("excludes additional section records when mixed with CNAME chain", function()
+      -- Simulates a DNS response with CNAME chain in Answer section
+      -- plus glue records in Additional section.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "target.domain.com",
+            ttl = 30,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.domain.com",
+            address = "10.0.0.1",
+            ttl = 86400,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns1.otherdomain.com",
+            address = "10.0.0.111",
+            ttl = 1200,
+            section = 3,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns2.otherdomain.com",
+            address = "10.0.0.112",
+            ttl = 1200,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.equal(1, #result)
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal("myalias.domain.com", result[1].name)
+      -- min TTL should be from CNAME chain (section 1 only): min(30, 86400) = 30
+      assert.equal(30, result[1].ttl)
+    end)
+
+    it("does not return additional section records even when answer section is empty", function()
+      -- When answer section has no A records but additional section does,
+      -- finalCacheOnly should not return the additional section A records.
+      mock_records = {
+        ["myservice.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myservice.domain.com",
+            cname = "target.domain.com",
+            ttl = 30,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns1.otherdomain.com",
+            address = "10.0.0.11",
+            ttl = 1200,
+            section = 3,
+          },
+        }
+      }
+      -- Should not return the section 3 A record as an answer.
+      -- With only CNAME in Answer section and no A record to dereference,
+      -- resolution should either fail or return CNAME only.
+      local result, err = client.resolve("myservice", { qtype = client.TYPE_A })
+      if result and #result > 0 then
+        for _, r in ipairs(result) do
+          assert.not_equal(3, r.section)
+          assert.not_equal("10.0.0.11", r.address)
+        end
+      else
+        assert.truthy(result == nil or #result == 0,
+          "expected nil or empty result, got err: " .. tostring(err))
+      end
+    end)
+
+  end)
+
+
   describe("hosts entries", function()
     -- hosts file names are cached for 10 years, verify that
     -- it is not overwritten with validTtl settings.
