@@ -860,8 +860,10 @@ local function syncQuery(qname, r_opts, try_list, count)
   end
 
   local supported_semaphore_wait_phases = {
+    server_rewrite = true,
     rewrite = true,
     access = true,
+    precontent = true,
     content = true,
     timer = true,
     ssl_cert = true,
