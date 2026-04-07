@@ -15,18 +15,18 @@ qq {
     init_worker_by_lua_block {
         local client = require("resty.dns.client")
         assert(client.init({
-            nameservers = { "8.8.8.8" },
+            nameservers = { {"127.0.0.1", 15353} },
             hosts = {}, -- empty tables to parse to prevent defaulting to /etc/hosts
             resolvConf = {}, -- and resolv.conf files
             order = { "A" },
         }))
-        local host = "httpbin.org"
+        local host = "svc1.test"
         local typ = client.TYPE_A
         for i = 1, 10 do
             client.resolve(host, { qtype = typ })
         end
 
-        local host = "mockbin.org"
+        local host = "svc2.test"
         for i = 1, 10 do
             client.resolve(host, { qtype = typ })
         end
@@ -40,22 +40,29 @@ qq {
     location = /t {
         access_by_lua_block {
             local client = require("resty.dns.client")
-            assert(client.init())
-            local host = "httpbin.org"
+            assert(client.init({
+                nameservers = { {"127.0.0.1", 15353} },
+                hosts = {},
+                resolvConf = {},
+                order = { "A" },
+            }))
+            local host = "svc1.test"
             local typ = client.TYPE_A
             local answers, err = client.resolve(host, { qtype = typ })
 
             if not answers then
                 ngx.say("failed to resolve: ", err)
+                return
             end
 
             ngx.say("first address name: ", answers[1].name)
 
-            host = "mockbin.org"
+            host = "svc2.test"
             answers, err = client.resolve(host, { qtype = typ })
 
             if not answers then
                 ngx.say("failed to resolve: ", err)
+                return
             end
 
             ngx.say("second address name: ", answers[1].name)
@@ -69,8 +76,8 @@ qq {
 --- request
 GET /t
 --- response_body
-first address name: httpbin.org
-second address name: mockbin.org
+first address name: svc1.test
+second address name: svc2.test
 workers: 6
 timers: 2
 --- no_error_log

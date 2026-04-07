@@ -19,5 +19,17 @@
     template IN A {
         match "^run\.api7\.ai\.$"
         answer "{{ .Name }} 10 IN CNAME one.cloudfront.net."
+        fallthrough
+    }
+
+    template IN A {
+        match "^svc1\.test\.$"
+        answer "{{ .Name }} 300 IN A 192.168.1.1"
+        fallthrough
+    }
+
+    template IN A {
+        match "^svc2\.test\.$"
+        answer "{{ .Name }} 300 IN A 192.168.1.2"
     }
 }
