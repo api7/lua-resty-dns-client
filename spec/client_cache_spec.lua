@@ -917,6 +917,58 @@ describe("[DNS client cache]", function()
       assert.equal(20, result[1].ttl)
     end)
 
+    it("does not collapse a same-type record from outside the chain", function()
+      -- Only the records owned by the name the chain ends at may be renamed
+      -- onto the queried name. A record of the requested type that belongs to
+      -- some other name answers a question nobody asked, and renaming it would
+      -- return and cache a foreign address under the queried alias.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "target.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "unrelated.otherdomain.com",
+            address = "203.0.113.66",
+            ttl = 300,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.1",
+            ttl = 30,
+            section = 1,
+          }, {
+            type = 46, -- RRSIG
+            class = 1,
+            name = "target.otherdomain.com",
+            rdata = "signature",
+            ttl = 30,
+            section = 1,
+          },
+        }
+      }
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.is_nil(err)
+      assert.equal(1, #result)
+      assert.equal("myalias.domain.com", result[1].name)
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal(30, result[1].ttl)
+
+      local cached = lrucache:get(client.TYPE_A .. ":myalias.domain.com")
+      assert.equal(1, #cached)
+      for _, record in ipairs(cached) do
+        assert.not_equal("203.0.113.66", record.address)
+      end
+    end)
+
   end)
 
 

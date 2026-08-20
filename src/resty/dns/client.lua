@@ -659,50 +659,56 @@ local function parseAnswer(qname, qtype, answers, try_list)
     -- when only caching final results, we remove all non-requested
     local SECTION_AN = 1  -- Answer section
 
-    -- Collapse a CNAME chain: the tail records are owned by the canonical
-    -- name, so rename them to the queried name and give them the shortest TTL
-    -- in the Answer section. Decide that from the contents of the Answer
-    -- section alone. `answers` is the flattened Answer + Authority +
-    -- Additional sections, and record order within a section is the
-    -- responder's to choose, so neither may be read as a signal. A CNAME
-    -- query asks for the alias record itself and has nothing to collapse.
-    local has_cname, has_qtype = false, false
+    -- Collapse a CNAME chain: the records the chain ends at are owned by the
+    -- canonical name, so rename them to the queried name and give them the
+    -- shortest TTL along the way. Follow the aliases to find that name; only
+    -- the records it owns may be collapsed, as a record owned by anything else
+    -- answers a question nobody asked. Read all of this from the Answer
+    -- section, and never from a record's position: `answers` is the flattened
+    -- Answer + Authority + Additional sections, and order within a section is
+    -- the responder's to choose. A CNAME query asks for the alias record
+    -- itself and has nothing to collapse.
+    local aliases, target, chain_ttl = {}, check_qname, math.huge
     if qtype ~= _M.TYPE_CNAME then
       for i = 1, #answers do
-        if answers[i].section == SECTION_AN then
-          if answers[i].type == qtype then
-            has_qtype = true
-          elseif answers[i].type == _M.TYPE_CNAME
-                 and string_lower(answers[i].name) == check_qname then
-            has_cname = true
-          end
+        local answer = answers[i]
+        if answer.section == SECTION_AN and answer.type == _M.TYPE_CNAME then
+          aliases[string_lower(answer.name)] = answer
         end
+      end
+
+      for _ = 1, #answers do -- bounded, so a cyclic chain cannot spin here
+        local link = aliases[target]
+        if not link then
+          break
+        end
+        target = string_lower(link.cname)
+        chain_ttl = math_min(link.ttl, chain_ttl)
       end
     end
 
-    if has_cname and has_qtype then
-      local min_ttl = math.huge
-      local j = 0
+    if target ~= check_qname then
+      local min_ttl, j = chain_ttl, 0
       for i = 1, #answers do
-        -- Only keep Answer section (section=1) records. Additional section
-        -- (section=3) records are glue records for nameservers and must not
-        -- be mixed with Answer section records. Without this check, their
-        -- names get overwritten to the queried name below, causing wrong
-        -- IPs to be returned for the queried domain.
-        if answers[i].section == SECTION_AN then
-          min_ttl = math_min(answers[i].ttl, min_ttl)
-          if answers[i].type == qtype then
-            j = j + 1
-            answers[j] = answers[i]
-          end
+        local answer = answers[i]
+        if answer.section == SECTION_AN and answer.type == qtype
+           and string_lower(answer.name) == target then
+          min_ttl = math_min(answer.ttl, min_ttl)
+          j = j + 1
+          answers[j] = answer
         end
       end
-      for i = 1, #answers do
-        if i > j then
-          table.remove(answers)
-        else
-          answers[i].name = check_qname
-          answers[i].ttl = min_ttl
+
+      -- nothing of the requested type at the end of the chain: leave the
+      -- answers alone so the loop below can still sort and cache them
+      if j > 0 then
+        for i = 1, #answers do
+          if i > j then
+            table.remove(answers)
+          else
+            answers[i].name = check_qname
+            answers[i].ttl = min_ttl
+          end
         end
       end
     end
