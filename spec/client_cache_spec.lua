@@ -746,7 +746,10 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      -- untyped: this is the path that sets `additional_section`, so it is the
+      -- only one that sees an OPT record in production. SRV is tried first and
+      -- misses through the mock's default name error.
+      local result, err = client.resolve("myalias")
       assert.is_nil(err)
       assert.equal(2, #result)
       for _, record in ipairs(result) do
@@ -836,6 +839,82 @@ describe("[DNS client cache]", function()
       local glue = lrucache:get(client.TYPE_A .. ":ns1.otherdomain.com")
       assert.is_table(glue)
       assert.equal("192.168.5.233", glue[1].address)
+    end)
+
+    it("collapses a chain whose Answer section is not in chain order", function()
+      -- Nothing obliges a responder to order the Answer section along the
+      -- chain, so the decision to collapse must not depend on which record
+      -- happens to come last. Owner names are compared case-insensitively,
+      -- as everywhere else in this function.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.1",
+            ttl = 20,
+            section = 1,
+          }, {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "MyAlias.Domain.Com",
+            cname = "target.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          },
+        }
+      }
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.is_nil(err)
+      assert.equal(1, #result)
+      assert.equal("myalias.domain.com", result[1].name)
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal(20, result[1].ttl)
+    end)
+
+    it("collapses a multi-link chain trailed by another record type", function()
+      -- A signed answer carries its RRSIG in the Answer section, after the
+      -- records it covers. Same requirement as above, one link further along.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "middle.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "middle.otherdomain.com",
+            cname = "target.otherdomain.com",
+            ttl = 45,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.1",
+            ttl = 20,
+            section = 1,
+          }, {
+            type = 46, -- RRSIG
+            class = 1,
+            name = "target.otherdomain.com",
+            rdata = "signature",
+            ttl = 20,
+            section = 1,
+          },
+        }
+      }
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.is_nil(err)
+      assert.equal(1, #result)
+      assert.equal("myalias.domain.com", result[1].name)
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal(20, result[1].ttl)
     end)
 
   end)

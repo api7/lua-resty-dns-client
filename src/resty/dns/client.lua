@@ -659,30 +659,28 @@ local function parseAnswer(qname, qtype, answers, try_list)
     -- when only caching final results, we remove all non-requested
     local SECTION_AN = 1  -- Answer section
 
-    -- This block exists to collapse a CNAME chain: the tail records are owned
-    -- by the canonical name, so they are renamed to the queried name and given
-    -- the TTL of the shortest link. Enter it only when the queried name really
-    -- is an alias, and only by looking at the Answer section: `answers` is the
-    -- flattened Answer + Authority + Additional sections, so the last entry of
-    -- the list is not necessarily an answer. A responder may append an OPT
-    -- (EDNS(0)) record or authority/glue records, and testing the last entry of
-    -- the whole list would then skip the collapsing and leave the chain
-    -- unresolved. A CNAME query asks for the alias record itself, so there is
-    -- no tail to collapse and nothing to do here.
-    local has_cname, last_an = false, nil
+    -- Collapse a CNAME chain: the tail records are owned by the canonical
+    -- name, so rename them to the queried name and give them the shortest TTL
+    -- in the Answer section. Decide that from the contents of the Answer
+    -- section alone. `answers` is the flattened Answer + Authority +
+    -- Additional sections, and record order within a section is the
+    -- responder's to choose, so neither may be read as a signal. A CNAME
+    -- query asks for the alias record itself and has nothing to collapse.
+    local has_cname, has_qtype = false, false
     if qtype ~= _M.TYPE_CNAME then
       for i = 1, #answers do
         if answers[i].section == SECTION_AN then
-          last_an = answers[i]
-          if answers[i].type == _M.TYPE_CNAME
-             and string_lower(answers[i].name) == check_qname then
+          if answers[i].type == qtype then
+            has_qtype = true
+          elseif answers[i].type == _M.TYPE_CNAME
+                 and string_lower(answers[i].name) == check_qname then
             has_cname = true
           end
         end
       end
     end
 
-    if has_cname and last_an.type == qtype then
+    if has_cname and has_qtype then
       local min_ttl = math.huge
       local j = 0
       for i = 1, #answers do
