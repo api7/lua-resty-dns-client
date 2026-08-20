@@ -656,31 +656,72 @@ local function parseAnswer(qname, qtype, answers, try_list)
   end
 
   if finalCacheOnly then
-    -- when only caching final results, we remove all non-requested
-    if #answers >= 2 and answers[#answers].type == qtype then
-      local SECTION_AN = 1  -- Answer section
-      local min_ttl = math.huge
-      local j = 0
+    local SECTION_AN = 1  -- Answer section
+
+    -- Collapse a CNAME chain: the records the chain ends at are owned by the
+    -- canonical name, so rename them to the queried name and give them the
+    -- shortest TTL along the way. Follow the aliases to find that name; only
+    -- the records it owns may be collapsed, as a record owned by anything else
+    -- answers a question nobody asked. Read all of this from the Answer
+    -- section, and never from a record's position: `answers` is the flattened
+    -- Answer + Authority + Additional sections, and order within a section is
+    -- the responder's to choose. A CNAME query asks for the alias record
+    -- itself and has nothing to collapse.
+    local aliases, chain = {}, {}
+    local target, chain_ttl, followed = string_lower(check_qname), math.huge, false
+    if qtype ~= _M.TYPE_CNAME then
       for i = 1, #answers do
-        -- Only keep Answer section (section=1) records. Additional section
-        -- (section=3) records are glue records for nameservers and must not
-        -- be mixed with Answer section records. Without this check, their
-        -- names get overwritten to the queried name below, causing wrong
-        -- IPs to be returned for the queried domain.
-        if answers[i].section == SECTION_AN then
-          min_ttl = math_min(answers[i].ttl, min_ttl)
-          if answers[i].type == qtype then
-            j = j + 1
-            answers[j] = answers[i]
-          end
+        local answer = answers[i]
+        if answer.section == SECTION_AN and answer.type == _M.TYPE_CNAME then
+          aliases[string_lower(answer.name)] = answer
         end
       end
+
+      -- stop on a name already seen, so a cyclic chain ends at a name that
+      -- does not depend on how many records the response happens to carry
+      while not chain[target] do
+        local link = aliases[target]
+        if not link then
+          break
+        end
+        chain[target] = true
+        target = string_lower(link.cname)
+        chain_ttl = math_min(link.ttl, chain_ttl)
+        followed = true
+      end
+    end
+
+    -- A walk that ended on a name it had already visited went round a loop
+    -- rather than reaching an end, and a response whose chain does not end
+    -- resolves to nothing.
+    local count, min_ttl = 0, chain_ttl
+    if followed and not chain[target] then
       for i = 1, #answers do
-        if i > j then
-          table.remove(answers)
-        else
-          answers[i].name = check_qname
-          answers[i].ttl = min_ttl
+        local answer = answers[i]
+        if answer.section == SECTION_AN and answer.type == qtype
+           and string_lower(answer.name) == target then
+          min_ttl = math_min(answer.ttl, min_ttl)
+          count = count + 1
+        end
+      end
+    end
+
+    -- Nothing of the requested type at the end of the chain means there is
+    -- nothing to collapse, and the answers are left as they came in. Otherwise
+    -- drop the links themselves, which are the intermediate results this
+    -- option exists to keep out of the cache, and leave everything else for
+    -- the loop below to sort and cache under its own name.
+    if count > 0 then
+      for i = #answers, 1, -1 do
+        local answer = answers[i]
+        if answer.section == SECTION_AN then
+          local name = string_lower(answer.name)
+          if answer.type == qtype and name == target then
+            answer.name = check_qname
+            answer.ttl = min_ttl
+          elseif answer.type == _M.TYPE_CNAME and chain[name] then
+            table_remove(answers, i)
+          end
         end
       end
     end
