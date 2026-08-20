@@ -801,7 +801,8 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      local result = client.resolve("myservice", { qtype = client.TYPE_SRV })
+      local result, err = client.resolve("myservice", { qtype = client.TYPE_SRV })
+      assert.is_nil(err)
       assert.equal(2, #result)
       local glue = lrucache:get(client.TYPE_A .. ":node1.domain.com")
       assert.is_table(glue)
@@ -836,7 +837,8 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      local result = client.resolve("myalias", { qtype = client.TYPE_CNAME })
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_CNAME })
+      assert.is_nil(err)
       assert.equal(1, #result)
       assert.equal("target.otherdomain.com", result[1].cname)
       local glue = lrucache:get(client.TYPE_A .. ":ns1.otherdomain.com")
@@ -997,8 +999,8 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      local result = client.resolve("myalias", { qtype = client.TYPE_A })
-      assert.truthy(result == nil or #result == 0)
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0, "unexpected result, err: " .. tostring(err))
 
       local alias = lrucache:get(client.TYPE_CNAME .. ":myalias.domain.com")
       assert.is_table(alias)
@@ -1032,8 +1034,8 @@ describe("[DNS client cache]", function()
           },
         }
       }
-      local result = client.resolve("myhost", { qtype = client.TYPE_A })
-      assert.truthy(result == nil or #result == 0)
+      local result, err = client.resolve("myhost", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0, "unexpected result, err: " .. tostring(err))
 
       local cached = lrucache:get(client.TYPE_A .. ":myhost.domain.com")
       for _, record in ipairs(cached or {}) do
@@ -1042,15 +1044,23 @@ describe("[DNS client cache]", function()
     end)
 
     it("does not collapse a cyclic chain", function()
-      -- Following a cycle must end somewhere that does not depend on how many
-      -- records the response happens to carry, and a name whose only answer
-      -- record is a CNAME has no address of its own to hand out.
+      -- A walk that comes back to a name it has already passed went round a
+      -- loop rather than reaching an end, and the address parked on that name
+      -- is not an answer for the queried one. The loop need not run back into
+      -- the queried name for that to hold.
       mock_records = {
         ["myalias.domain.com:" .. client.TYPE_A] = {
           {
             type = client.TYPE_CNAME,
             class = 1,
             name = "myalias.domain.com",
+            cname = "mymiddle.domain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "mymiddle.domain.com",
             cname = "myloop.domain.com",
             ttl = 60,
             section = 1,
@@ -1058,21 +1068,21 @@ describe("[DNS client cache]", function()
             type = client.TYPE_CNAME,
             class = 1,
             name = "myloop.domain.com",
-            cname = "myalias.domain.com",
+            cname = "mymiddle.domain.com",
             ttl = 60,
             section = 1,
           }, {
             type = client.TYPE_A,
             class = 1,
-            name = "myloop.domain.com",
+            name = "mymiddle.domain.com",
             address = "203.0.113.9",
             ttl = 30,
             section = 1,
           },
         }
       }
-      local result = client.resolve("myalias", { qtype = client.TYPE_A })
-      assert.truthy(result == nil or #result == 0)
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0, "unexpected result, err: " .. tostring(err))
 
       local cached = lrucache:get(client.TYPE_A .. ":myalias.domain.com")
       for _, record in ipairs(cached or {}) do

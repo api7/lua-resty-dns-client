@@ -691,8 +691,11 @@ local function parseAnswer(qname, qtype, answers, try_list)
       end
     end
 
+    -- A walk that ended on a name it had already visited went round a loop
+    -- rather than reaching an end, and a response whose chain does not end
+    -- resolves to nothing.
     local count, min_ttl = 0, chain_ttl
-    if followed then
+    if followed and not chain[target] then
       for i = 1, #answers do
         local answer = answers[i]
         if answer.section == SECTION_AN and answer.type == qtype
