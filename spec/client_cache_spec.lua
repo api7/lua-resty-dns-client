@@ -704,6 +704,62 @@ describe("[DNS client cache]", function()
       end
     end)
 
+    it("resolves a CNAME chain when the response ends with an OPT record", function()
+      -- Regression: a responder may append an EDNS(0) OPT record (type 41,
+      -- Additional section) to its response even when the query carried no
+      -- OPT of its own. That OPT record is then the last entry of the
+      -- flattened answer list, so testing only the last entry made
+      -- finalCacheOnly bail out. The chain-tail A records, which are owned
+      -- by the canonical name, were subsequently dropped by the name filter
+      -- and the lookup failed with "empty record received".
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "target.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.1",
+            ttl = 30,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.2",
+            ttl = 30,
+            section = 1,
+          }, {
+            -- OPT pseudo-record, as parsed by resty.dns.resolver when the
+            -- responder puts EDNS(0) in the Additional section
+            type = 41,
+            class = 4096,
+            name = "",
+            ttl = 0,
+            section = 3,
+          },
+        }
+      }
+      local result, err = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.is_nil(err)
+      assert.equal(2, #result)
+      for _, record in ipairs(result) do
+        assert.equal("myalias.domain.com", record.name)
+        assert.equal(client.TYPE_A, record.type)
+        assert.equal(1, record.section)
+        -- min TTL across the Answer section only: min(60, 30, 30) = 30
+        assert.equal(30, record.ttl)
+      end
+      assert.equal("10.0.0.1", result[1].address)
+      assert.equal("10.0.0.2", result[2].address)
+    end)
+
   end)
 
 

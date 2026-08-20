@@ -657,8 +657,22 @@ local function parseAnswer(qname, qtype, answers, try_list)
 
   if finalCacheOnly then
     -- when only caching final results, we remove all non-requested
-    if #answers >= 2 and answers[#answers].type == qtype then
-      local SECTION_AN = 1  -- Answer section
+    local SECTION_AN = 1  -- Answer section
+
+    -- Locate the last Answer section record. `answers` is the flattened
+    -- Answer + Authority + Additional sections, so the last entry is not
+    -- necessarily an answer: responders may append an OPT (EDNS(0)) record
+    -- or authority/glue records. Testing the last entry of the whole list
+    -- would then skip this block entirely and leave the chain unresolved.
+    local an_count, last_an = 0, nil
+    for i = 1, #answers do
+      if answers[i].section == SECTION_AN then
+        an_count = an_count + 1
+        last_an = answers[i]
+      end
+    end
+
+    if an_count >= 2 and last_an.type == qtype then
       local min_ttl = math.huge
       local j = 0
       for i = 1, #answers do
