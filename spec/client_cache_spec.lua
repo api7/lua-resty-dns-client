@@ -809,11 +809,14 @@ describe("[DNS client cache]", function()
     end)
 
     it("keeps additional section records cacheable for CNAME lookups", function()
-      -- A CNAME query asks for the alias record itself, so there is no chain
-      -- tail to collapse: the branch must stay out of the way here too and
-      -- leave the Additional section to the sorting loop below. The untyped
-      -- resolve() path issues CNAME queries as part of its type order, so this
-      -- is a live code path, not a corner case.
+      -- A CNAME query asks for the alias record itself, so there is nothing to
+      -- collapse and the Additional section must reach the sorting loop below.
+      -- The untyped resolve() path issues CNAME queries as part of its type
+      -- order, so this is a live code path, not a corner case. Note this pins
+      -- the end-to-end requirement, not the `qtype ~= TYPE_CNAME` guard: a
+      -- fully walked chain never ends at a name that still owns a CNAME, so
+      -- that guard is all but unreachable and is kept as a statement of
+      -- intent.
       mock_records = {
         ["myalias.domain.com:" .. client.TYPE_CNAME] = {
           {
@@ -966,6 +969,114 @@ describe("[DNS client cache]", function()
       assert.equal(1, #cached)
       for _, record in ipairs(cached) do
         assert.not_equal("203.0.113.66", record.address)
+      end
+    end)
+
+    it("leaves the answers alone when the chain ends at nothing to collapse", function()
+      -- The chain leads somewhere, but the Answer section holds none of the
+      -- requested type for it -- the address is in the Additional section,
+      -- where it answers nothing. Touching the answers here would cost the
+      -- sorting loop below the records it would otherwise cache, and with them
+      -- the CNAME that lets a later lookup pick the chain up again.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "target.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "target.otherdomain.com",
+            address = "10.0.0.9",
+            ttl = 300,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0)
+
+      local alias = lrucache:get(client.TYPE_CNAME .. ":myalias.domain.com")
+      assert.is_table(alias)
+      assert.equal("target.otherdomain.com", alias[1].cname)
+
+      local additional = lrucache:get(client.TYPE_A .. ":target.otherdomain.com")
+      assert.is_table(additional)
+      assert.equal("10.0.0.9", additional[1].address)
+    end)
+
+    it("does not follow an alias from outside the Answer section", function()
+      -- An alias that only shows up in the Additional section is not an answer
+      -- to anything. Following it would hand the queried name an address that
+      -- belongs to a name the answer section never tied it to.
+      mock_records = {
+        ["myhost.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_A,
+            class = 1,
+            name = "elsewhere.otherdomain.com",
+            address = "10.0.0.5",
+            ttl = 30,
+            section = 1,
+          }, {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myhost.domain.com",
+            cname = "elsewhere.otherdomain.com",
+            ttl = 60,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myhost", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0)
+
+      local cached = lrucache:get(client.TYPE_A .. ":myhost.domain.com")
+      for _, record in ipairs(cached or {}) do
+        assert.not_equal("10.0.0.5", record.address)
+      end
+    end)
+
+    it("does not collapse a cyclic chain", function()
+      -- Following a cycle must end somewhere that does not depend on how many
+      -- records the response happens to carry, and a name whose only answer
+      -- record is a CNAME has no address of its own to hand out.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_A] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "myloop.domain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myloop.domain.com",
+            cname = "myalias.domain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "myloop.domain.com",
+            address = "203.0.113.9",
+            ttl = 30,
+            section = 1,
+          },
+        }
+      }
+      local result = client.resolve("myalias", { qtype = client.TYPE_A })
+      assert.truthy(result == nil or #result == 0)
+
+      local cached = lrucache:get(client.TYPE_A .. ":myalias.domain.com")
+      for _, record in ipairs(cached or {}) do
+        assert.not_equal("203.0.113.9", record.address)
       end
     end)
 
