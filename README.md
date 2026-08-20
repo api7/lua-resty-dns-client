@@ -53,6 +53,10 @@ Release process:
 4. commit and tag the release
 5. upload rock to LuaRocks
 
+### 7.1.2 (20-Aug-2026)
+
+* fix: follow the CNAME chain when collapsing final records [PR 14](https://github.com/api7/lua-resty-dns-client/pull/14)
+
 ### 7.1.1 (01-Apr-2026)
 
 * fix: exclude additional section records from finalCacheOnly results [PR 11](https://github.com/api7/lua-resty-dns-client/pull/11)
