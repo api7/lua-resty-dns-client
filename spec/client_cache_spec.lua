@@ -760,6 +760,84 @@ describe("[DNS client cache]", function()
       assert.equal("10.0.0.2", result[2].address)
     end)
 
+    it("keeps additional section glue records cacheable for SRV lookups", function()
+      -- The branch truncates the answer list, so it must stay out of the way
+      -- of responses that are not a CNAME chain. An SRV response carries A
+      -- glue records for its targets in the Additional section; those are
+      -- sorted into the cache by the loop below the branch, and losing them
+      -- costs one extra lookup per target.
+      mock_records = {
+        ["myservice.domain.com:" .. client.TYPE_SRV] = {
+          {
+            type = client.TYPE_SRV,
+            class = 1,
+            name = "myservice.domain.com",
+            target = "node1.domain.com",
+            port = 8080,
+            weight = 10,
+            priority = 20,
+            ttl = 300,
+            section = 1,
+          }, {
+            type = client.TYPE_SRV,
+            class = 1,
+            name = "myservice.domain.com",
+            target = "node2.domain.com",
+            port = 8080,
+            weight = 10,
+            priority = 20,
+            ttl = 300,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "node1.domain.com",
+            address = "192.168.5.232",
+            ttl = 300,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myservice", { qtype = client.TYPE_SRV })
+      assert.equal(2, #result)
+      local glue = lrucache:get(client.TYPE_A .. ":node1.domain.com")
+      assert.is_table(glue)
+      assert.equal("192.168.5.232", glue[1].address)
+    end)
+
+    it("keeps additional section records cacheable for CNAME lookups", function()
+      -- A CNAME query asks for the alias record itself, so there is no chain
+      -- tail to collapse: the branch must stay out of the way here too and
+      -- leave the Additional section to the sorting loop below. The untyped
+      -- resolve() path issues CNAME queries as part of its type order, so this
+      -- is a live code path, not a corner case.
+      mock_records = {
+        ["myalias.domain.com:" .. client.TYPE_CNAME] = {
+          {
+            type = client.TYPE_CNAME,
+            class = 1,
+            name = "myalias.domain.com",
+            cname = "target.otherdomain.com",
+            ttl = 60,
+            section = 1,
+          }, {
+            type = client.TYPE_A,
+            class = 1,
+            name = "ns1.otherdomain.com",
+            address = "192.168.5.233",
+            ttl = 300,
+            section = 3,
+          },
+        }
+      }
+      local result = client.resolve("myalias", { qtype = client.TYPE_CNAME })
+      assert.equal(1, #result)
+      assert.equal("target.otherdomain.com", result[1].cname)
+      local glue = lrucache:get(client.TYPE_A .. ":ns1.otherdomain.com")
+      assert.is_table(glue)
+      assert.equal("192.168.5.233", glue[1].address)
+    end)
+
   end)
 
 

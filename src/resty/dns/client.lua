@@ -659,20 +659,30 @@ local function parseAnswer(qname, qtype, answers, try_list)
     -- when only caching final results, we remove all non-requested
     local SECTION_AN = 1  -- Answer section
 
-    -- Locate the last Answer section record. `answers` is the flattened
-    -- Answer + Authority + Additional sections, so the last entry is not
-    -- necessarily an answer: responders may append an OPT (EDNS(0)) record
-    -- or authority/glue records. Testing the last entry of the whole list
-    -- would then skip this block entirely and leave the chain unresolved.
-    local an_count, last_an = 0, nil
-    for i = 1, #answers do
-      if answers[i].section == SECTION_AN then
-        an_count = an_count + 1
-        last_an = answers[i]
+    -- This block exists to collapse a CNAME chain: the tail records are owned
+    -- by the canonical name, so they are renamed to the queried name and given
+    -- the TTL of the shortest link. Enter it only when the queried name really
+    -- is an alias, and only by looking at the Answer section: `answers` is the
+    -- flattened Answer + Authority + Additional sections, so the last entry of
+    -- the list is not necessarily an answer. A responder may append an OPT
+    -- (EDNS(0)) record or authority/glue records, and testing the last entry of
+    -- the whole list would then skip the collapsing and leave the chain
+    -- unresolved. A CNAME query asks for the alias record itself, so there is
+    -- no tail to collapse and nothing to do here.
+    local has_cname, last_an = false, nil
+    if qtype ~= _M.TYPE_CNAME then
+      for i = 1, #answers do
+        if answers[i].section == SECTION_AN then
+          last_an = answers[i]
+          if answers[i].type == _M.TYPE_CNAME
+             and string_lower(answers[i].name) == check_qname then
+            has_cname = true
+          end
+        end
       end
     end
 
-    if an_count >= 2 and last_an.type == qtype then
+    if has_cname and last_an.type == qtype then
       local min_ttl = math.huge
       local j = 0
       for i = 1, #answers do
