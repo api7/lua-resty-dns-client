@@ -902,9 +902,14 @@ local function syncQuery(qname, r_opts, try_list, count)
 
   local supported_semaphore_wait_phases = {
     rewrite = true,
+    server_rewrite = true,
     access = true,
+    precontent = true,
     content = true,
     timer = true,
+    proxy_ssl_cert = true,
+    proxy_ssl_verify = true,
+    ssl_client_hello = true,
     ssl_cert = true,
     ssl_session_fetch = true,
     preread = true,
